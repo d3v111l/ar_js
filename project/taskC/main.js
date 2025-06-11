@@ -15,7 +15,18 @@ function init() {
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // Додаємо штатну кнопку запуску AR
+  // Світло
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  scene.add(light);
+
+  // Тестова молекула (зелена сфера)
+  const geometry = new THREE.SphereGeometry(0.05, 32, 32);
+  const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+  const molecule = new THREE.Mesh(geometry, material);
+  molecule.position.set(0, 0, -0.5); // 0.5м перед камерою
+  scene.add(molecule);
+
+  // Додаємо кнопку запуску AR
   document.body.appendChild(ARButton.createButton(renderer));
 
   window.addEventListener('resize', onWindowResize);
