@@ -33,7 +33,6 @@ function init() {
   btn.style.left = '10px';
   btn.style.padding = '10px';
   btn.style.fontSize = '16px';
-  btn.textContent = 'Старт';
   document.body.appendChild(btn);
 
   btn.addEventListener('click', () => {
@@ -48,11 +47,7 @@ function init() {
     addMolecules();
   });
 
-  renderer.xr.addEventListener('sessionend', () => {
-    removeMolecules();
-    animationRunning = false;
-    btn.textContent = 'Старт';
-  });
+
 
   window.addEventListener('resize', onWindowResize);
 }
