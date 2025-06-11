@@ -99,14 +99,65 @@ function createO() {
 }
 
 function createH2O() {
-  // Для простоти — одна більша блакитна сфера
-  const geometry = new THREE.SphereGeometry(0.04, 16, 16);
-  const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
-  const water = new THREE.Mesh(geometry, material);
-  water.userData.type = 'H2O';
+  const group = new THREE.Group();
+  group.userData.type = 'H2O';
 
-  return water;
+  // Кисень (червоний, більший)
+  const oxygenGeometry = new THREE.SphereGeometry(0.035, 16, 16);
+  const oxygenMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+  const oxygen = new THREE.Mesh(oxygenGeometry, oxygenMaterial);
+  oxygen.position.set(0, 0, 0);
+  group.add(oxygen);
+
+  // Водні атоми (білі, менші)
+  const hydrogenGeometry = new THREE.SphereGeometry(0.015, 16, 16);
+  const hydrogenMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+  // Кут між H-O-H ~104.5° (приблизно 1.82 радіан)
+  const angle = 104.5 * Math.PI / 180; 
+
+  // Водень 1
+  const h1 = new THREE.Mesh(hydrogenGeometry, hydrogenMaterial);
+  h1.position.set(Math.sin(angle / 2) * 0.06, Math.cos(angle / 2) * 0.06, 0);
+  group.add(h1);
+
+  // Водень 2
+  const h2 = new THREE.Mesh(hydrogenGeometry, hydrogenMaterial);
+  h2.position.set(-Math.sin(angle / 2) * 0.06, Math.cos(angle / 2) * 0.06, 0);
+  group.add(h2);
+
+  // Зв’язки — циліндри (тонкі)
+  const bondMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+  const bondRadius = 0.005;
+  const bondLength = 0.06;
+
+  // Функція для створення циліндра між двома точками
+  function createBond(start, end) {
+    const dir = new THREE.Vector3().subVectors(end, start);
+    const length = dir.length();
+    const bondGeometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8);
+    
+    const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+
+    // Позиція - середина між start і end
+    const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    bond.position.copy(midPoint);
+
+    // Орієнтація циліндра по напрямку вектора dir
+    bond.lookAt(end);
+    bond.rotateX(Math.PI / 2);
+
+    return bond;
+  }
+
+  // Зв’язок O-H1
+  group.add(createBond(oxygen.position, h1.position));
+  // Зв’язок O-H2
+  group.add(createBond(oxygen.position, h2.position));
+
+  return group;
 }
+
 
 function addMolecules() {
   for (let i = 0; i < moleculeCountH2; i++) {
