@@ -43,7 +43,7 @@ function init() {
 // --- Каталізатор (Pt) ---
 function createCatalyst() {
   const geometry = new THREE.SphereGeometry(0.02, 12, 12);
-  const material = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 1, roughness: 0.4 });
+  const material = new THREE.MeshStandardMaterial({ color: 0x6E6E6E, metalness: 1, roughness: 0.4 });
   const catalyst = new THREE.Mesh(geometry, material);
   catalyst.position.set(
     (Math.random() - 0.5) * 1.0,
