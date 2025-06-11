@@ -3,16 +3,16 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.m
 
 let camera, scene, renderer;
 const molecules = [];
-const catalysts = [];
-const moleculeCountH2 = 20; // більше H2
-const moleculeCountO = 20;  // більше O
-const catalystCount = 3;
+const moleculeCountH2 = 10;
+const moleculeCountO = 10;
+const catalystCount = 5;
+let animationRunning = false;
 
 init();
-animate();
 
 function init() {
   scene = new THREE.Scene();
+
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -26,14 +26,32 @@ function init() {
   const arButton = ARButton.createButton(renderer);
   document.body.appendChild(arButton);
 
+  // Кнопка запуску/пауза анімації
+  const btn = document.createElement('button');
+  btn.style.position = 'absolute';
+  btn.style.top = '10px';
+  btn.style.left = '10px';
+  btn.style.padding = '10px';
+  btn.style.fontSize = '16px';
+  btn.textContent = 'Старт';
+  document.body.appendChild(btn);
+
+  btn.addEventListener('click', () => {
+    animationRunning = !animationRunning;
+    btn.textContent = animationRunning ? 'Пауза' : 'Старт';
+    if (animationRunning) {
+      animate();
+    }
+  });
+
   renderer.xr.addEventListener('sessionstart', () => {
-    addCatalysts();
     addMolecules();
   });
 
   renderer.xr.addEventListener('sessionend', () => {
     removeMolecules();
-    removeCatalysts();
+    animationRunning = false;
+    btn.textContent = 'Старт';
   });
 
   window.addEventListener('resize', onWindowResize);
@@ -52,16 +70,29 @@ function createH2() {
   atom1.position.set(-0.03, 0, 0);
   atom2.position.set(0.03, 0, 0);
 
-  group.add(atom1, atom2);
+  group.add(atom1);
+  group.add(atom2);
 
   const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
-  const points = [atom1.position.clone(), atom2.position.clone()];
+  const points = [];
+  points.push(atom1.position);
+  points.push(atom2.position);
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
   const line = new THREE.Line(lineGeometry, lineMaterial);
   group.add(line);
 
-  group.position.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4 - 0.5);
-  group.userData.velocity = randomVelocity();
+  group.position.set(
+    (Math.random() - 0.5),
+    (Math.random() - 0.5),
+    (Math.random() - 0.5) - 0.5
+  );
+
+  group.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.003,
+    (Math.random() - 0.5) * 0.003,
+    (Math.random() - 0.5) * 0.003
+  );
+
   return group;
 }
 
@@ -71,9 +102,41 @@ function createO() {
   const oxygen = new THREE.Mesh(geometry, material);
   oxygen.userData.type = 'O';
 
-  oxygen.position.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4 - 0.5);
-  oxygen.userData.velocity = randomVelocity();
+  oxygen.position.set(
+    (Math.random() - 0.5),
+    (Math.random() - 0.5),
+    (Math.random() - 0.5) - 0.5
+  );
+
+  oxygen.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.003,
+    (Math.random() - 0.5) * 0.003,
+    (Math.random() - 0.5) * 0.003
+  );
+
   return oxygen;
+}
+
+function createCatalyst() {
+  // Каталізатор — маленька сфера синього кольору, не реагує, але пришвидшує реакції поруч
+  const geometry = new THREE.SphereGeometry(0.015, 12, 12);
+  const material = new THREE.MeshStandardMaterial({ color: 0x0000ff, emissive: 0x0000aa, emissiveIntensity: 0.6 });
+  const catalyst = new THREE.Mesh(geometry, material);
+  catalyst.userData.type = 'CAT';
+
+  catalyst.position.set(
+    (Math.random() - 0.5),
+    (Math.random() - 0.5),
+    (Math.random() - 0.5) - 0.5
+  );
+
+  catalyst.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.001,
+    (Math.random() - 0.5) * 0.001,
+    (Math.random() - 0.5) * 0.001
+  );
+
+  return catalyst;
 }
 
 function createH2O() {
@@ -88,48 +151,40 @@ function createH2O() {
 
   const hydrogenGeometry = new THREE.SphereGeometry(0.015, 16, 16);
   const hydrogenMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
   const angle = 104.5 * Math.PI / 180;
 
   const h1 = new THREE.Mesh(hydrogenGeometry, hydrogenMaterial);
   h1.position.set(Math.sin(angle / 2) * 0.06, Math.cos(angle / 2) * 0.06, 0);
+  group.add(h1);
+
   const h2 = new THREE.Mesh(hydrogenGeometry, hydrogenMaterial);
   h2.position.set(-Math.sin(angle / 2) * 0.06, Math.cos(angle / 2) * 0.06, 0);
-  group.add(h1, h2);
+  group.add(h2);
 
   const bondMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc });
-  group.add(createBond(oxygen.position, h1.position, bondMaterial));
-  group.add(createBond(oxygen.position, h2.position, bondMaterial));
+  const bondRadius = 0.005;
+
+  function createBond(start, end) {
+    const dir = new THREE.Vector3().subVectors(end, start);
+    const length = dir.length();
+    const bondGeometry = new THREE.CylinderGeometry(bondRadius, bondRadius, length, 8);
+
+    const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+
+    const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+    bond.position.copy(midPoint);
+
+    bond.lookAt(end);
+    bond.rotateX(Math.PI / 2);
+
+    return bond;
+  }
+
+  group.add(createBond(oxygen.position, h1.position));
+  group.add(createBond(oxygen.position, h2.position));
 
   return group;
-}
-
-function createBond(start, end, material) {
-  const dir = new THREE.Vector3().subVectors(end, start);
-  const length = dir.length();
-  const geometry = new THREE.CylinderGeometry(0.005, 0.005, length, 8);
-  const bond = new THREE.Mesh(geometry, material);
-  bond.position.copy(new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5));
-  bond.lookAt(end);
-  bond.rotateX(Math.PI / 2);
-  return bond;
-}
-
-function createCatalyst() {
-  const geometry = new THREE.TorusGeometry(0.05, 0.01, 8, 16);
-  const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
-  const ring = new THREE.Mesh(geometry, material);
-  ring.userData.type = 'catalyst';
-  ring.rotation.x = Math.PI / 2;
-  ring.position.set((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3 - 0.5);
-  return ring;
-}
-
-function randomVelocity() {
-  return new THREE.Vector3(
-    (Math.random() - 0.5) * 0.01, // швидше рух
-    (Math.random() - 0.5) * 0.01,
-    (Math.random() - 0.5) * 0.01
-  );
 }
 
 function addMolecules() {
@@ -142,6 +197,11 @@ function addMolecules() {
     const o = createO();
     molecules.push(o);
     scene.add(o);
+  }
+  for (let i = 0; i < catalystCount; i++) {
+    const c = createCatalyst();
+    molecules.push(c);
+    scene.add(c);
   }
 }
 
@@ -160,24 +220,8 @@ function removeMolecules() {
   molecules.length = 0;
 }
 
-function addCatalysts() {
-  for (let i = 0; i < catalystCount; i++) {
-    const catalyst = createCatalyst();
-    catalysts.push(catalyst);
-    scene.add(catalyst);
-  }
-}
-
-function removeCatalysts() {
-  catalysts.forEach(c => {
-    scene.remove(c);
-    c.geometry.dispose();
-    c.material.dispose();
-  });
-  catalysts.length = 0;
-}
-
 function animate() {
+  if (!animationRunning) return;
   renderer.setAnimationLoop(render);
 }
 
@@ -191,8 +235,12 @@ function updateMolecules() {
     molecule.position.add(molecule.userData.velocity);
 
     ['x', 'y', 'z'].forEach(axis => {
-      if (molecule.position[axis] > 0.5 || molecule.position[axis] < -0.5) {
-        molecule.position[axis] = THREE.MathUtils.clamp(molecule.position[axis], -0.5, 0.5);
+      if (molecule.position[axis] > 0.5) {
+        molecule.position[axis] = 0.5;
+        molecule.userData.velocity[axis] *= -1;
+      }
+      if (molecule.position[axis] < -0.5) {
+        molecule.position[axis] = -0.5;
         molecule.userData.velocity[axis] *= -1;
       }
     });
@@ -202,10 +250,67 @@ function updateMolecules() {
 }
 
 function checkReactions() {
+  // Перевіряємо всі пари молекул
   for (let i = 0; i < molecules.length; i++) {
     for (let j = i + 1; j < molecules.length; j++) {
       const m1 = molecules[i];
       const m2 = molecules[j];
       const dist = m1.position.distanceTo(m2.position);
 
-      const types
+      const types = [m1.userData.type, m2.userData.type];
+
+      if (dist < 0.07) {
+        if (types.includes('H2') && types.includes('O')) {
+          // Якщо поруч каталізатор, збільшуємо шанс реакції
+          const nearCatalyst = molecules.some(mol => {
+            return mol.userData.type === 'CAT' && mol.position.distanceTo(m1.position) < 0.15;
+          });
+
+          if (nearCatalyst || Math.random() < 0.7) {
+            reactH2O(m1, m2);
+            return; // тільки одна реакція за кадр
+          }
+        }
+      }
+    }
+  }
+}
+
+function reactH2O(m1, m2) {
+  removeMolecule(m1);
+  removeMolecule(m2);
+
+  const pos = new THREE.Vector3().addVectors(m1.position, m2.position).multiplyScalar(0.5);
+  const h2o = createH2O();
+  h2o.position.copy(pos);
+  h2o.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002
+  );
+
+  molecules.push(h2o);
+  scene.add(h2o);
+}
+
+function removeMolecule(molecule) {
+  scene.remove(molecule);
+  const index = molecules.indexOf(molecule);
+  if (index !== -1) molecules.splice(index, 1);
+
+  if (molecule.geometry) {
+    molecule.geometry.dispose();
+  } else {
+    molecule.children.forEach(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+  }
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
