@@ -4,8 +4,8 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.m
 let camera, scene, renderer;
 const molecules = [];
 const catalysts = [];
-const moleculeCountH2 = 10;
-const moleculeCountO = 10;
+const moleculeCountH2 = 20; // більше H2
+const moleculeCountO = 20;  // більше O
 const catalystCount = 3;
 
 init();
@@ -27,8 +27,8 @@ function init() {
   document.body.appendChild(arButton);
 
   renderer.xr.addEventListener('sessionstart', () => {
-    addMolecules();
     addCatalysts();
+    addMolecules();
   });
 
   renderer.xr.addEventListener('sessionend', () => {
@@ -60,7 +60,7 @@ function createH2() {
   const line = new THREE.Line(lineGeometry, lineMaterial);
   group.add(line);
 
-  group.position.set((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5) - 0.5);
+  group.position.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4 - 0.5);
   group.userData.velocity = randomVelocity();
   return group;
 }
@@ -71,7 +71,7 @@ function createO() {
   const oxygen = new THREE.Mesh(geometry, material);
   oxygen.userData.type = 'O';
 
-  oxygen.position.set((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5) - 0.5);
+  oxygen.position.set((Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.4 - 0.5);
   oxygen.userData.velocity = randomVelocity();
   return oxygen;
 }
@@ -120,15 +120,15 @@ function createCatalyst() {
   const ring = new THREE.Mesh(geometry, material);
   ring.userData.type = 'catalyst';
   ring.rotation.x = Math.PI / 2;
-  ring.position.set((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5) - 0.5);
+  ring.position.set((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3 - 0.5);
   return ring;
 }
 
 function randomVelocity() {
   return new THREE.Vector3(
-    (Math.random() - 0.5) * 0.002,
-    (Math.random() - 0.5) * 0.002,
-    (Math.random() - 0.5) * 0.002
+    (Math.random() - 0.5) * 0.01, // швидше рух
+    (Math.random() - 0.5) * 0.01,
+    (Math.random() - 0.5) * 0.01
   );
 }
 
@@ -208,50 +208,4 @@ function checkReactions() {
       const m2 = molecules[j];
       const dist = m1.position.distanceTo(m2.position);
 
-      const types = [m1.userData.type, m2.userData.type];
-
-      const isCatalyzed = catalysts.some(cat =>
-        m1.position.distanceTo(cat.position) < 0.1 ||
-        m2.position.distanceTo(cat.position) < 0.1
-      );
-
-      if (dist < 0.07 && types.includes('H2') && types.includes('O') && isCatalyzed) {
-        reactH2O(m1, m2);
-        return;
-      }
-    }
-  }
-}
-
-function reactH2O(m1, m2) {
-  removeMolecule(m1);
-  removeMolecule(m2);
-
-  const pos = new THREE.Vector3().addVectors(m1.position, m2.position).multiplyScalar(0.5);
-  const h2o = createH2O();
-  h2o.position.copy(pos);
-  h2o.userData.velocity = randomVelocity();
-  molecules.push(h2o);
-  scene.add(h2o);
-}
-
-function removeMolecule(molecule) {
-  scene.remove(molecule);
-  const index = molecules.indexOf(molecule);
-  if (index !== -1) molecules.splice(index, 1);
-
-  if (molecule.geometry) {
-    molecule.geometry.dispose();
-  } else {
-    molecule.children.forEach(c => {
-      if (c.geometry) c.geometry.dispose();
-      if (c.material) c.material.dispose();
-    });
-  }
-}
-
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
+      const types
