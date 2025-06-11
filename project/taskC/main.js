@@ -1,8 +1,10 @@
 import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/webxr/ARButton.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
 
 let camera, scene, renderer;
-const molecules = []; // масив молекул
-const moleculeCount = 30;
+const molecules = [];
+const moleculeCountH2 = 10;
+const moleculeCountO = 10;
 
 init();
 animate();
@@ -17,66 +19,120 @@ function init() {
   renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // Світло
   const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
   scene.add(light);
 
-  // AR кнопка
   const arButton = ARButton.createButton(renderer);
   document.body.appendChild(arButton);
 
   renderer.xr.addEventListener('sessionstart', () => {
-    console.log('AR session started');
     addMolecules();
   });
 
   renderer.xr.addEventListener('sessionend', () => {
-    console.log('AR session ended');
     removeMolecules();
   });
 
   window.addEventListener('resize', onWindowResize);
 }
 
-function createMolecule() {
-  // Різні кольори — різні типи молекул
-  const colors = [0x00ff00, 0xff0000, 0x0000ff, 0xffff00];
-  const color = colors[Math.floor(Math.random() * colors.length)];
+function createH2() {
+  // Група з двох білих сфер, зв’язок - лінія
+  const group = new THREE.Group();
+  group.userData.type = 'H2';
 
-  const geometry = new THREE.SphereGeometry(0.03, 16, 16);
-  const material = new THREE.MeshStandardMaterial({ color: color });
-  const molecule = new THREE.Mesh(geometry, material);
+  const geometry = new THREE.SphereGeometry(0.02, 16, 16);
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
 
-  // Початкова позиція в межах куба 1м x 1м x 1м навколо користувача
-  molecule.position.set(
+  const atom1 = new THREE.Mesh(geometry, material);
+  const atom2 = new THREE.Mesh(geometry, material);
+
+  atom1.position.set(-0.03, 0, 0);
+  atom2.position.set(0.03, 0, 0);
+
+  group.add(atom1);
+  group.add(atom2);
+
+  // Лінія між атомами
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+  const points = [];
+  points.push(atom1.position);
+  points.push(atom2.position);
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+  const line = new THREE.Line(lineGeometry, lineMaterial);
+  group.add(line);
+
+  group.position.set(
     (Math.random() - 0.5),
     (Math.random() - 0.5),
-    (Math.random() - 0.5) - 0.5 // трохи попереду камери
+    (Math.random() - 0.5) - 0.5
   );
 
-  // Додамо випадовий напрямок руху (вектор швидкості)
-  molecule.userData.velocity = new THREE.Vector3(
+  group.userData.velocity = new THREE.Vector3(
     (Math.random() - 0.5) * 0.002,
     (Math.random() - 0.5) * 0.002,
     (Math.random() - 0.5) * 0.002
   );
 
-  return molecule;
+  return group;
+}
+
+function createO() {
+  const geometry = new THREE.SphereGeometry(0.03, 16, 16);
+  const material = new THREE.MeshStandardMaterial({ color: 0xff0000 }); // червоний кисень
+  const oxygen = new THREE.Mesh(geometry, material);
+  oxygen.userData.type = 'O';
+
+  oxygen.position.set(
+    (Math.random() - 0.5),
+    (Math.random() - 0.5),
+    (Math.random() - 0.5) - 0.5
+  );
+
+  oxygen.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002
+  );
+
+  return oxygen;
+}
+
+function createH2O() {
+  // Для простоти — одна більша блакитна сфера
+  const geometry = new THREE.SphereGeometry(0.04, 16, 16);
+  const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+  const water = new THREE.Mesh(geometry, material);
+  water.userData.type = 'H2O';
+
+  return water;
 }
 
 function addMolecules() {
-  for (let i = 0; i < moleculeCount; i++) {
-    const m = createMolecule();
-    molecules.push(m);
-    scene.add(m);
+  for (let i = 0; i < moleculeCountH2; i++) {
+    const h2 = createH2();
+    molecules.push(h2);
+    scene.add(h2);
+  }
+  for (let i = 0; i < moleculeCountO; i++) {
+    const o = createO();
+    molecules.push(o);
+    scene.add(o);
   }
 }
 
 function removeMolecules() {
   molecules.forEach(m => {
     scene.remove(m);
-    m.geometry.dispose();
-    m.material.dispose();
+    if (m.geometry) {
+      m.geometry.dispose();
+    } else {
+      // якщо група, очищаємо кожен дочірній елемент
+      m.children.forEach(c => {
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
+      });
+    }
   });
   molecules.length = 0;
 }
@@ -91,11 +147,9 @@ function render() {
 }
 
 function updateMolecules() {
-  // Простий рух молекул
   molecules.forEach(molecule => {
     molecule.position.add(molecule.userData.velocity);
 
-    // Обмеження руху в кубі [-0.5..0.5] у кожній координаті (щоб молекули не розбігалися дуже далеко)
     ['x','y','z'].forEach(axis => {
       if (molecule.position[axis] > 0.5) {
         molecule.position[axis] = 0.5;
@@ -108,29 +162,61 @@ function updateMolecules() {
     });
   });
 
-  checkCollisions();
+  checkReactions();
 }
 
-function checkCollisions() {
-  // Перевірка зіткнень між молекулами (наївна O(n^2))
+function checkReactions() {
+  // Перевіряємо чи H2 + O зустрілись і створюємо H2O
   for (let i = 0; i < molecules.length; i++) {
     for (let j = i + 1; j < molecules.length; j++) {
       const m1 = molecules[i];
       const m2 = molecules[j];
       const dist = m1.position.distanceTo(m2.position);
-      if (dist < 0.06) { // якщо сфери близько (радіус ~0.03)
-        react(m1, m2);
+
+      if (dist < 0.07) {
+        const types = [m1.userData.type, m2.userData.type];
+        if (types.includes('H2') && types.includes('O')) {
+          // Реакція!
+          reactH2O(m1, m2);
+          return; // зробимо одну реакцію за кадр для плавності
+        }
       }
     }
   }
 }
 
-function react(m1, m2) {
-  // Реакція: при зіткненні молекули міняють колір на білий (проста імітація реакції)
-  m1.material.color.set(0xffffff);
-  m2.material.color.set(0xffffff);
+function reactH2O(m1, m2) {
+  // Видаляємо молекули H2 та O зі сцени і масиву
+  removeMolecule(m1);
+  removeMolecule(m2);
 
-  // Можна додати логіку каталітичного ефекту чи іншу зміну
+  // Створюємо нову H2O молекулу в позиції приблизно між двома реактивами
+  const pos = new THREE.Vector3().addVectors(m1.position, m2.position).multiplyScalar(0.5);
+  const h2o = createH2O();
+  h2o.position.copy(pos);
+  h2o.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002,
+    (Math.random() - 0.5) * 0.002
+  );
+
+  molecules.push(h2o);
+  scene.add(h2o);
+}
+
+function removeMolecule(molecule) {
+  scene.remove(molecule);
+  const index = molecules.indexOf(molecule);
+  if (index !== -1) molecules.splice(index, 1);
+
+  if (molecule.geometry) {
+    molecule.geometry.dispose();
+  } else {
+    molecule.children.forEach(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) c.material.dispose();
+    });
+  }
 }
 
 function onWindowResize() {
