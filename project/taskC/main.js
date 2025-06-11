@@ -23,25 +23,20 @@ function init() {
   const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
   scene.add(light);
 
+  // Штатна кнопка WebXR ARButton
   const arButton = ARButton.createButton(renderer);
   document.body.appendChild(arButton);
 
-  // Кнопка запуску/пауза анімації
-  const btn = document.createElement('button');
-  btn.style.position = 'absolute';
-  btn.style.top = '10px';
-  btn.style.left = '10px';
-  btn.style.padding = '10px';
-  btn.style.fontSize = '16px';
-  document.body.appendChild(btn);
-
-  btn.addEventListener('click', () => {
-    animationRunning = !animationRunning;
-    btn.textContent = animationRunning ? 'Пауза' : 'Старт';
-    if (animationRunning) {
-      animate();
-    }
+  // Запускаємо анімацію одразу при старті XR-сесії
+  renderer.xr.addEventListener('sessionstart', () => {
+    addMolecules();
+    animationRunning = true;
+    animate();
   });
+
+  window.addEventListener('resize', onWindowResize);
+}
+
 
   renderer.xr.addEventListener('sessionstart', () => {
     addMolecules();
